@@ -1,84 +1,58 @@
-#include <iostream>
-#include <mosquitto.h>
-#include <ctime>
+#include<iostream>
+#include<mosquitto.h>
+#include<ctime>
 #include "gnuplot_i.hpp"
+using namespace std;
 
 int main() {
-  // Create a MQTT client
+  /*Creating a MQTT client*/
   mosquitto_client *client = mosquitto_new("client_id", true, NULL);
-
-  // Connect to the MQTT broker
+  // Connecting to the MQTT broker
   if (mosquitto_connect(client, "localhost", 1883, 60) != MOSQ_ERR_SUCCESS) {
-    std::cout << "Error connecting to the MQTT broker" << std::endl;
+    cout << "Error connecting to the MQTT broker" << endl;
     return -1;
   }
-
-  // Subscribe to the "/cpu_frequency" and "/battery_status" topics
+  /*Subscribing to topics "/cpu_frequency" and "/battery_status".*/
   mosquitto_subscribe(client, "/cpu_frequency", 0);
   mosquitto_subscribe(client, "/battery_status", 0);
-
-  // Initialize variables for CPU frequency and battery status
-  int cpu_frequency = 0;
-  int battery_status = 0;
-
-  // Initialize variables for time and timestamp
-  std::time_t current_time;
+  int cpu_freq = 0;
+  int battery_stat = 0;
+  time_t current_time;
   double timestamp = 0;
-
-  // Initialize Gnuplot
+  /*Setting up the plot*/
   Gnuplot plot;
   plot.set_title("CPU Frequency and Battery Status vs Time");
   plot.set_xlabel("Time");
   plot.set_ylabel("Value");
   plot.cmd("set style data lines");
-
-  // Start receiving messages
   while (true) {
-    // Receive a message
-    mosquitto_message *message = mosquitto_receive(client, 1000);
-    if (message != NULL) {
-      // Check the topic of the message
-      if (strcmp(message->topic, "/cpu_frequency") == 0) {
-        // Get the CPU frequency
-        cpu_frequency = *((int *)message->payload);
-
-        // Print the CPU frequency
-        std::cout << "CPU frequency: " << cpu_frequency << std::endl;
-
-        // Get the current time and timestamp
-        current_time = std::time(nullptr);
+    /*Receive a message*/
+    mosquitto_message *msg = mosquitto_receive(client, 1000);
+    if (msg != NULL) {
+      if (strcmp(msg->topic, "/cpu_frequency") == 0) {
+        /*Get the CPU frequency*/
+        cpu_freq = *((int *)msg->payload);
+        cout << "CPU frequency: " << cpu_freq << endl;
+        current_time = time(nullptr);
         timestamp = static_cast<double>(current_time);
-
-        // Add the data point to the plot
         plot.reset_plot();
-        plot.plot_xy(timestamp, cpu_frequency, "CPU Frequency");
-        plot.plot_xy(timestamp, battery_status, "Battery Status");
-
-      } else if (strcmp(message->topic, "/battery_status") == 0) {
-        // Get the battery status
-        battery_status = *((int *)message->payload);
-
-        // Print the battery status
-        std::cout << "Battery status: " << battery_status << std::endl;
-
-        // Get the current time and timestamp
-        current_time = std::time(nullptr);
+        plot.plot_xy(timestamp, cpu_freq, "CPU Frequency");
+        plot.plot_xy(timestamp, battery_stat, "Battery Status");
+      } else if (strcmp(msg->topic, "/battery_status") == 0) {
+        /*Get the battery status*/
+        battery_stat = *((int *)msg->payload);
+        cout << "Battery status: " << battery_stat << endl;
+        current_time = time(nullptr);
         timestamp = static_cast<double>(current_time);
-
-        // Add the data point to the plot
         plot.reset_plot();
-        plot.plot_xy(timestamp, cpu_frequency, "CPU Frequency");
-        plot.plot_xy(timestamp, battery_status, "Battery Status");
+        plot.plot_xy(timestamp, cpu_freq, "CPU Frequency");
+        plot.plot_xy(timestamp, battery_stat, "Battery Status");
       }
-      mosquitto_free_message(message);
-    }
-  }
-
-  // Disconnect from the MQTT broker and  Destroy the MQTT client
+      mosquitto_free_message(msg);
+    }}
+  /*Disconnect from the MQTT broker and destroy the MQTT client*/
   mosquitto_disconnect(client);
   mosquitto_destroy(client);
-
   mosquitto_lib_cleanup();
-
   return 0;
 }
