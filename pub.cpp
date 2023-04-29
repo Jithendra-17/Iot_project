@@ -1,7 +1,6 @@
 #include <iostream>
 #include <mosquitto.h>
 #include<cpufreq.h>
-// #include <sys/sysinfo.h>
 #ifdef _WIN32
 #include <windows.h>
 #elif __linux__
