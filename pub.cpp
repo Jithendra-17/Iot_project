@@ -1,7 +1,17 @@
 #include <iostream>
 #include <mosquitto.h>
 #include<cpufreq.h>
-#include <sys/sysinfo.h>
+// #include <sys/sysinfo.h>
+#ifdef _WIN32
+#include <windows.h>
+#elif __linux__
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <cstring>
+#include <cstdlib>
+
 using namespace std;
 
 //Funtion to get the current cpu frequency
@@ -21,15 +31,75 @@ int get_cpu_frequency() {
 }
 
 //Function to get battery status
-int get_battery_status() {
-    struct sysinfo info;
-    if (sysinfo(&info) != 0) {
-        std::cout << "Error getting system information" << std::endl;
-        return -1;
-    }
+enum BatteryStatus {
+    BATTERY_STATUS_UNKNOWN = 0,
+    BATTERY_STATUS_CHARGING = 1,
+    BATTERY_STATUS_DISCHARGING = 2,
+    BATTERY_STATUS_FULL = 3,
+};
 
-    return info.battery_level;
+BatteryStatus getBatteryStatus() {
+    BatteryStatus status = BATTERY_STATUS_UNKNOWN;
+
+#ifdef _WIN32
+    SYSTEM_POWER_STATUS powerStatus;
+    if (GetSystemPowerStatus(&powerStatus)) {
+        if (powerStatus.ACLineStatus == 1) {
+            status = BATTERY_STATUS_CHARGING;
+        } else {
+            switch (powerStatus.BatteryFlag) {
+                case 8:
+                    status = BATTERY_STATUS_CHARGING;
+                    break;
+                case 128:
+                    status = BATTERY_STATUS_FULL;
+                    break;
+                default:
+                    status = BATTERY_STATUS_DISCHARGING;
+                    break;
+            }
+        }
+    }
+#elif __linux__
+    int fd = open("/sys/class/power_supply/BAT0/status", O_RDONLY);
+    if (fd != -1) {
+        char buffer[16];
+        ssize_t n = read(fd, buffer, sizeof(buffer));
+        if (n > 0) {
+            buffer[n-1] = '\0'; // Remove trailing newline
+            if (strcmp(buffer, "Charging") == 0) {
+                status = BATTERY_STATUS_CHARGING;
+            } else if (strcmp(buffer, "Full") == 0) {
+                status = BATTERY_STATUS_FULL;
+            } else {
+                status = BATTERY_STATUS_DISCHARGING;
+            }
+        }
+        close(fd);
+    }
+#endif
+
+    return status;
 }
+
+void get_battery_status() {
+    BatteryStatus status = getBatteryStatus();
+    switch (status) {
+        case BATTERY_STATUS_UNKNOWN:
+            std::cout << "Unknown" << std::endl;
+            break;
+        case BATTERY_STATUS_CHARGING:
+            std::cout << "Charging" << std::endl;
+            break;
+        case BATTERY_STATUS_DISCHARGING:
+            std::cout << "Discharging" << std::endl;
+            break;
+        case BATTERY_STATUS_FULL:
+            std::cout << "Full" << std::endl;
+            break;
+    }
+}
+
 
 
 int main() {
